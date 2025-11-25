@@ -52,10 +52,10 @@ func main() {
 
 	srvc := service.NewService(repo)
 
-	userHandler := &handlers.UserHandler{Service: srvc.UserService}
-	teamHandler := &handlers.TeamHandler{Service: srvc.TeamService, PRService: srvc.PrService}
-	prHandler := &handlers.PRHandler{Service: srvc.PrService}
-	statsHandler := &handlers.StatisticsHandler{Service: srvc.StatService}
+	userHandler := &handlers.UserHandler{UserService: srvc.UserService}
+	teamHandler := &handlers.TeamHandler{TeamService: srvc.TeamService, PRService: srvc.PrService}
+	prHandler := &handlers.PRHandler{PRService: srvc.PrService}
+	statsHandler := &handlers.StatisticsHandler{StatService: srvc.StatService}
 
 	r := mux.NewRouter()
 
@@ -71,7 +71,6 @@ func main() {
 	r.HandleFunc("/api/v1/team/{team_id}", teamHandler.GetTeam).Methods("GET")
 	r.HandleFunc("/api/v1/team/{team_id}", teamHandler.UpdateTeam).Methods("PUT")
 	r.HandleFunc("/api/v1/team/{team_id}", teamHandler.DeleteTeam).Methods("DELETE")
-	r.HandleFunc("/api/v1/team/{team_id}/deactivate-members", teamHandler.DeactivateTeamMembers).Methods("POST")
 
 	r.HandleFunc("/api/v1/pull-request/create", prHandler.CreatePR).Methods("POST")
 	r.HandleFunc("/api/v1/pull-request", prHandler.GetAllPRs).Methods("GET")

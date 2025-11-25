@@ -2,16 +2,17 @@ package handlers
 
 import (
 	"encoding/json"
-	"github.com/anguless/reviewer/internal/service"
 	"net/http"
+
+	"github.com/anguless/reviewer/internal/service"
 )
 
 type StatisticsHandler struct {
-	Service service.StatService
+	StatService service.StatService
 }
 
 func (h *StatisticsHandler) GetStatistics(w http.ResponseWriter, r *http.Request) {
-	stats, err := h.Service.GetReviewStats()
+	stats, err := h.StatService.GetReviewStats(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -41,7 +41,6 @@ type TeamService interface {
 	GetTeamByID(ctx context.Context, id uuid.UUID) (*model.Team, error)
 	UpdateTeam(ctx context.Context, team *model.Team) (*model.Team, error)
 	DeleteTeam(ctx context.Context, id uuid.UUID) error
-	DeactivateTeamMembers(ctx context.Context, teamID uuid.UUID, PrService *pr.PrService) (int, error)
 }
 
 type PrService interface {

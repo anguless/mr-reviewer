@@ -2,9 +2,9 @@ package handlers
 
 import (
 	"encoding/json"
+
 	"github.com/anguless/reviewer/internal/model"
 	"github.com/anguless/reviewer/internal/service"
-	"github.com/samber/lo"
 
 	"net/http"
 
@@ -13,7 +13,7 @@ import (
 )
 
 type UserHandler struct {
-	Service service.UserService
+	UserService service.UserService
 }
 
 func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
@@ -22,7 +22,7 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	createdUser, err := h.Service.CreateUser(user)
+	createdUser, err := h.UserService.CreateUser(r.Context(), &user)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -45,7 +45,7 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.Service.GetUserByID(id)
+	user, err := h.UserService.GetUserByID(r.Context(), id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -65,7 +65,7 @@ func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updatedUser, err := h.Service.UpdateUser(&user)
+	updatedUser, err := h.UserService.UpdateUser(r.Context(), &user)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -87,7 +87,7 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.Service.DeleteUser(id)
+	err = h.UserService.DeleteUser(r.Context(), id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -105,7 +105,7 @@ func (h *UserHandler) GetUserPRs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	prs, err := h.Service.GetAssignedPRs(id)
+	prs, err := h.UserService.GetAssignedPRs(r.Context(), id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
+
 	"github.com/anguless/reviewer/internal/model"
 	"github.com/anguless/reviewer/internal/service"
+
 	"net/http"
 
 	"github.com/google/uuid"
@@ -11,8 +13,8 @@ import (
 )
 
 type TeamHandler struct {
-	Service   service.TeamService
-	PRService service.PrService
+	TeamService service.TeamService
+	PRService   service.PrService
 }
 
 func (h *TeamHandler) CreateTeam(w http.ResponseWriter, r *http.Request) {
@@ -22,7 +24,7 @@ func (h *TeamHandler) CreateTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	createdTeam, err := h.Service.CreateTeam(team)
+	createdTeam, err := h.TeamService.CreateTeam(r.Context(), &team)
 	if err != nil {
 		if err.Error() == "team with this name already exists" {
 			http.Error(w, err.Error(), http.StatusConflict)
@@ -51,7 +53,7 @@ func (h *TeamHandler) GetTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	team, err := h.Service.GetTeamByID(id)
+	team, err := h.TeamService.GetTeamByID(r.Context(), id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -80,7 +82,7 @@ func (h *TeamHandler) UpdateTeam(w http.ResponseWriter, r *http.Request) {
 	}
 	team.ID = id
 
-	updatedTeam, err := h.Service.UpdateTeam(&team)
+	updatedTeam, err := h.TeamService.UpdateTeam(r.Context(), &team)
 	if err != nil {
 		if err.Error() == "team not found" {
 			http.Error(w, err.Error(), http.StatusNotFound)
@@ -110,7 +112,7 @@ func (h *TeamHandler) DeleteTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.Service.DeleteTeam(id)
+	err = h.TeamService.DeleteTeam(r.Context(), id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -118,34 +120,6 @@ func (h *TeamHandler) DeleteTeam(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 	_, err = w.Write([]byte("Команда удалена"))
-	if err != nil {
-		return
-	}
-}
-
-func (h *TeamHandler) DeactivateTeamMembers(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	idStr := vars["team_id"]
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		http.Error(w, "invalid UUID", http.StatusBadRequest)
-		return
-	}
-
-	deactivatedCount, err := h.Service.DeactivateTeamMembers(id, h.PRService)
-	if err != nil {
-		if err.Error() == "team not found" {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	err = json.NewEncoder(w).Encode(map[string]interface{}{
-		"deactivated_count": deactivatedCount,
-	})
 	if err != nil {
 		return
 	}

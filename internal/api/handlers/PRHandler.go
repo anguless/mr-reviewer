@@ -2,9 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
+	"net/http"
+
 	"github.com/anguless/reviewer/internal/model"
 	"github.com/anguless/reviewer/internal/service"
-	"net/http"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
@@ -12,7 +13,7 @@ import (
 
 // PRHandler обрабатывает HTTP запросы, связанные с Pull Requests.
 type PRHandler struct {
-	Service service.PrService
+	PRService service.PrService
 }
 
 // CreatePRRequest представляет запрос на создание Pull Request.
@@ -39,7 +40,7 @@ func (h *PRHandler) CreatePR(w http.ResponseWriter, r *http.Request) {
 		AuthorID: req.AuthorID,
 	}
 
-	createdPR, err := h.Service.CreatePR(pr)
+	createdPR, err := h.PRService.CreatePR(r.Context(), pr)
 	if err != nil {
 		if err.Error() == "author not found" {
 			http.Error(w, "Автор/команда не найдены", http.StatusNotFound)
@@ -49,7 +50,7 @@ func (h *PRHandler) CreatePR(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pullReq, errGetting := h.Service.GetPRByID(createdPR.ID)
+	pullReq, errGetting := h.PRService.GetPRByID(r.Context(), createdPR.ID)
 	if errGetting != nil {
 		http.Error(w, errGetting.Error(), http.StatusInternalServerError)
 		return
@@ -76,7 +77,7 @@ func (h *PRHandler) GetPR(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pr, err := h.Service.GetPRByID(id)
+	pr, err := h.PRService.GetPRByID(r.Context(), id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -123,7 +124,7 @@ func (h *PRHandler) ReassignReviewer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 4. Вызываем доменную логику
-	updatedPR, replacedBy, err := h.Service.ReassignReviewer(prID, oldUserID)
+	updatedPR, replacedBy, err := h.PRService.ReassignReviewer(r.Context(), prID, oldUserID)
 	if err != nil {
 		switch err.Error() {
 		case "pull request not found", "user not found":
@@ -222,7 +223,7 @@ func (h *PRHandler) MergePR(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 4. Вызываем сервис
-	_, errMerged := h.Service.MergePR(prID)
+	_, errMerged := h.PRService.MergePR(r.Context(), prID)
 	if errMerged != nil {
 		if errMerged.Error() == "pull request not found" {
 			w.WriteHeader(http.StatusNotFound)
@@ -255,7 +256,7 @@ func (h *PRHandler) MergePR(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PRHandler) GetAllPRs(w http.ResponseWriter, r *http.Request) {
-	prs, err := h.Service.GetAllPRs()
+	prs, err := h.PRService.GetAllPRs(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/anguless/reviewer/internal/model"
-	"github.com/anguless/reviewer/internal/service/pr"
 	"github.com/google/uuid"
 )
 
@@ -85,52 +84,4 @@ func (s *TeamService) UpdateTeam(ctx context.Context, team *model.Team) (*model.
 
 func (s *TeamService) DeleteTeam(ctx context.Context, id uuid.UUID) error {
 	return s.teamRepo.DeleteTeam(ctx, id)
-}
-
-func (s *TeamService) DeactivateTeamMembers(ctx context.Context, teamID uuid.UUID, PrService *pr.PrService) (int, error) {
-	_, err := s.teamRepo.GetTeamByID(ctx, teamID)
-	if err != nil {
-		return 0, errors.New("team not found")
-	}
-
-	activeUsers, err := s.userRepo.GetActiveUsersByTeam(ctx, teamID, uuid.Nil)
-	if err != nil {
-		return 0, err
-	}
-
-	if len(activeUsers) == 0 {
-		return 0, nil
-	}
-
-	allPRs, err := PrService.GetAllPRs(ctx)
-	if err != nil {
-		return 0, err
-	}
-
-	userIDMap := make(map[uuid.UUID]bool)
-	for _, user := range activeUsers {
-		userIDMap[user.ID] = true
-	}
-
-	for _, pr := range allPRs {
-		if pr.Status != model.OPEN {
-			continue
-		}
-
-		for _, reviewerID := range pr.Reviewers {
-			if userIDMap[reviewerID] {
-				_, _, err = PrService.ReassignReviewer(ctx, pr.ID, reviewerID)
-				if err != nil {
-					continue
-				}
-			}
-		}
-	}
-
-	deactivatedCount, err := s.userRepo.DeactivateTeamMembers(ctx, teamID)
-	if err != nil {
-		return 0, err
-	}
-
-	return deactivatedCount, nil
 }

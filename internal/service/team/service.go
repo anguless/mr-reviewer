@@ -1,6 +1,8 @@
 package team
 
-import "github.com/anguless/reviewer/internal/repository"
+import (
+	"github.com/anguless/reviewer/internal/repository"
+)
 
 type TeamService struct {
 	teamRepo repository.TeamRepository
