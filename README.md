@@ -24,8 +24,8 @@
 
 1. Клонируем репозиторий:
 ```bash
-git clone <repository-url>
-cd avito-trainee-assignment
+git clone https://github.com/anguless/mr-reviewer
+cd mr-reviewer
 ```
 
 2. Запускаем сервис:
@@ -66,9 +66,18 @@ docker-compose up
 
 ### Создание команды
 ```bash
-curl -X POST http://localhost:8080/api/v1/teams \
+curl -X POST http://localhost:8080/api/v1/team/add \
   -H "Content-Type: application/json" \
-  -d '{"team_name": "Backend Team"}'
+  -d '
+  {
+  "team_name": "team",
+  "members": [
+    {
+      "username": "Ivan Ivanov",
+      "is_active": true
+    }
+  ]
+}'
 ```
 
 ### Создание пользователя
