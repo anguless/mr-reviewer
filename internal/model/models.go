@@ -17,7 +17,7 @@ type User struct {
 // Team представляет команду пользователей.
 type Team struct {
 	Name    string    `json:"team_name"`
-	Members []User    `json:"members,omitempty"`
+	Members []User    `json:"members"`
 	ID      uuid.UUID `json:"team_id"`
 }
 
