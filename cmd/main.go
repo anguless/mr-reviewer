@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/anguless/reviewer/internal/api/handlers"
 	"github.com/anguless/reviewer/internal/config"
@@ -61,7 +60,7 @@ func main() {
 
 	r.HandleFunc("/health", handlers.HealthCheck).Methods("GET")
 
-	r.HandleFunc("/api/v1/users", userHandler.CreateUser).Methods("POST")
+	r.HandleFunc("/api/v1/users/create", userHandler.CreateUser).Methods("POST")
 	r.HandleFunc("/api/v1/users/{user_id}", userHandler.GetUser).Methods("GET")
 	r.HandleFunc("/api/v1/users/{user_id}", userHandler.UpdateUser).Methods("PUT")
 	r.HandleFunc("/api/v1/users/{user_id}", userHandler.DeleteUser).Methods("DELETE")
@@ -80,14 +79,9 @@ func main() {
 
 	r.HandleFunc("/api/v1/statistics", statsHandler.GetStatistics).Methods("GET")
 
-	addr := ":8080"
-	if port := os.Getenv("PORT"); port != "" {
-		addr = ":" + port
-	}
+	log.Printf("Starting server at %s", ":"+cfg.AppConfig.AppPort)
 
-	log.Printf("Starting server at %s", addr)
-
-	if err := http.ListenAndServe(addr, r); err != nil {
+	if err := http.ListenAndServe(":"+cfg.AppConfig.AppPort, r); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}
 }
