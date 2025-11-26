@@ -9,6 +9,7 @@ import (
 type Config struct {
 	DbConfig        *DbConfig
 	MigrationConfig *MigrationConfig
+	AppConfig       *AppConfig
 }
 
 func LoadConfig() (*Config, error) {
@@ -27,8 +28,11 @@ func LoadConfig() (*Config, error) {
 		return nil, err
 	}
 
+	appConfig, err := loadAppConfig()
+
 	return &Config{
 		DbConfig:        dbConfig,
 		MigrationConfig: migrationConfig,
+		AppConfig:       appConfig,
 	}, nil
 }

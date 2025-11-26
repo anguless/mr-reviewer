@@ -14,35 +14,36 @@ type DbConfig struct {
 }
 
 func loadDbConfig() (*DbConfig, error) {
-	dbUsername := os.Getenv("DB_USERNAME")
+	dbUsername := os.Getenv("POSTGRES_USER")
 	if dbUsername == "" {
-		return nil, fmt.Errorf("DB_USERNAME is empty")
+		return nil, fmt.Errorf("POSTGRES_USER is empty")
 	}
 
-	dbPassword := os.Getenv("DB_PASSWORD")
+	dbPassword := os.Getenv("POSTGRES_PASSWORD")
 	if dbPassword == "" {
-		return nil, fmt.Errorf("DB_PASSWORD is empty")
+		return nil, fmt.Errorf("POSTGRES_PASSWORD is empty")
 	}
 
-	dBName := os.Getenv("DB_NAME")
+	dBName := os.Getenv("POSTGRES_DB")
 	if dBName == "" {
-		return nil, fmt.Errorf("DB_NAME is empty")
+		return nil, fmt.Errorf("POSTGRES_DB is empty")
 	}
 
-	dbHost := os.Getenv("DB_HOST")
+	dbHost := os.Getenv("POSTGRES_HOST")
 	if dbHost == "" {
-		return nil, fmt.Errorf("DB_HOST is empty")
+		return nil, fmt.Errorf("POSTGRES_HOST is empty")
 	}
 
-	dbPort := os.Getenv("DB_PORT")
+	dbPort := os.Getenv("POSTGRES_PORT")
 	if dbPort == "" {
-		return nil, fmt.Errorf("DB_PORT is empty")
+		return nil, fmt.Errorf("POSTGRES_PORT is empty")
 	}
 
 	return &DbConfig{
-		Username: dbUsername,
-		Password: dbPassword,
-		Host:     dbHost,
-		Port:     dbPort,
+		Username:  dbUsername,
+		Password:  dbPassword,
+		TableName: dBName,
+		Host:      dbHost,
+		Port:      dbPort,
 	}, nil
 }
