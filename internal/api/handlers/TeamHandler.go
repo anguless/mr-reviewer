@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
+	"log"
 
 	"github.com/anguless/reviewer/internal/model"
 	"github.com/anguless/reviewer/internal/service"
@@ -21,16 +23,19 @@ func (h *TeamHandler) CreateTeam(w http.ResponseWriter, r *http.Request) {
 	var team model.Team
 	if err := json.NewDecoder(r.Body).Decode(&team); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		log.Println(err)
 		return
 	}
 
 	createdTeam, err := h.TeamService.CreateTeam(r.Context(), &team)
 	if err != nil {
-		if err.Error() == "team with this name already exists" {
+		if errors.Is(err, model.ErrTeamExists) {
 			http.Error(w, err.Error(), http.StatusConflict)
+			log.Println(err)
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("TeamHandler error: createdTeam error: %v\n", err)
 		return
 	}
 

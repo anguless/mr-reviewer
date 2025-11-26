@@ -2,9 +2,11 @@ package team
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/anguless/reviewer/internal/model"
 )
@@ -43,6 +45,9 @@ func (r *teamRepository) GetByName(ctx context.Context, name string) (*model.Tea
 	var team model.Team
 	err := row.Scan(&team.ID, &team.Name)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return &team, nil

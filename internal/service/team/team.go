@@ -11,11 +11,12 @@ import (
 
 func (s *TeamService) CreateTeam(ctx context.Context, team *model.Team) (*model.Team, error) {
 	existing, err := s.teamRepo.GetByName(ctx, team.Name)
+
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("team service err: %w", err)
 	}
 	if existing != nil {
-		return nil, errors.New("team with this name already exists" + team.Name)
+		return nil, fmt.Errorf("%w: %v", model.ErrTeamExists, team.Name)
 	}
 
 	team.ID = uuid.New()
