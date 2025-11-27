@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/anguless/reviewer/internal/model"
-	"github.com/anguless/reviewer/internal/service"
+	"github.com/anguless/mr-reviewer/internal/model"
+	"github.com/anguless/mr-reviewer/internal/service"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"

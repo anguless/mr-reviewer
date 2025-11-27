@@ -1,4 +1,4 @@
-module github.com/anguless/reviewer
+module github.com/anguless/mr-reviewer
 
 go 1.24.0
 

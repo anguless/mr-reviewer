@@ -1,7 +1,7 @@
 package user
 
 import (
-	"github.com/anguless/reviewer/internal/db"
+	"github.com/anguless/mr-reviewer/internal/db"
 )
 
 type userRepository struct {

@@ -1,7 +1,7 @@
 package team
 
 import (
-	"github.com/anguless/reviewer/internal/db"
+	"github.com/anguless/mr-reviewer/internal/db"
 )
 
 type teamRepository struct {

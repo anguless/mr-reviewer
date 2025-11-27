@@ -1,6 +1,6 @@
 package pr
 
-import "github.com/anguless/reviewer/internal/db"
+import "github.com/anguless/mr-reviewer/internal/db"
 
 type prRepository struct {
 	db db.Database

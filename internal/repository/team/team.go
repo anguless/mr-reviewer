@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/anguless/reviewer/internal/model"
+	"github.com/anguless/mr-reviewer/internal/model"
 )
 
 func (r *teamRepository) CreateTeam(ctx context.Context, team *model.Team) error {

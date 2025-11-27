@@ -5,8 +5,8 @@ import (
 	"errors"
 	"log"
 
-	"github.com/anguless/reviewer/internal/model"
-	"github.com/anguless/reviewer/internal/service"
+	"github.com/anguless/mr-reviewer/internal/model"
+	"github.com/anguless/mr-reviewer/internal/service"
 
 	"net/http"
 

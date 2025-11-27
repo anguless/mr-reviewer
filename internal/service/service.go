@@ -3,12 +3,12 @@ package service
 import (
 	"context"
 
-	"github.com/anguless/reviewer/internal/model"
-	"github.com/anguless/reviewer/internal/repository"
-	"github.com/anguless/reviewer/internal/service/pr"
-	"github.com/anguless/reviewer/internal/service/stat"
-	"github.com/anguless/reviewer/internal/service/team"
-	"github.com/anguless/reviewer/internal/service/user"
+	"github.com/anguless/mr-reviewer/internal/model"
+	"github.com/anguless/mr-reviewer/internal/repository"
+	"github.com/anguless/mr-reviewer/internal/service/pr"
+	"github.com/anguless/mr-reviewer/internal/service/stat"
+	"github.com/anguless/mr-reviewer/internal/service/team"
+	"github.com/anguless/mr-reviewer/internal/service/user"
 	"github.com/google/uuid"
 )
 

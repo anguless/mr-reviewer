@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/anguless/reviewer/internal/service"
+	"github.com/anguless/mr-reviewer/internal/service"
 )
 
 type StatisticsHandler struct {

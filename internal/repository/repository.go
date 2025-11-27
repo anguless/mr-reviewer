@@ -3,12 +3,12 @@ package repository
 import (
 	"context"
 
-	"github.com/anguless/reviewer/internal/db"
-	"github.com/anguless/reviewer/internal/model"
-	"github.com/anguless/reviewer/internal/repository/pr"
-	"github.com/anguless/reviewer/internal/repository/stat"
-	"github.com/anguless/reviewer/internal/repository/team"
-	"github.com/anguless/reviewer/internal/repository/user"
+	"github.com/anguless/mr-reviewer/internal/db"
+	"github.com/anguless/mr-reviewer/internal/model"
+	"github.com/anguless/mr-reviewer/internal/repository/pr"
+	"github.com/anguless/mr-reviewer/internal/repository/stat"
+	"github.com/anguless/mr-reviewer/internal/repository/team"
+	"github.com/anguless/mr-reviewer/internal/repository/user"
 	"github.com/google/uuid"
 )
 

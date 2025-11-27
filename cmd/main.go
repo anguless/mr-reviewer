@@ -5,12 +5,12 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/anguless/reviewer/internal/api/handlers"
-	"github.com/anguless/reviewer/internal/config"
-	"github.com/anguless/reviewer/internal/db"
-	"github.com/anguless/reviewer/internal/migrator"
-	"github.com/anguless/reviewer/internal/repository"
-	"github.com/anguless/reviewer/internal/service"
+	"github.com/anguless/mr-reviewer/internal/api/handlers"
+	"github.com/anguless/mr-reviewer/internal/config"
+	"github.com/anguless/mr-reviewer/internal/db"
+	"github.com/anguless/mr-reviewer/internal/migrator"
+	"github.com/anguless/mr-reviewer/internal/repository"
+	"github.com/anguless/mr-reviewer/internal/service"
 
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"

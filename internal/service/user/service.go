@@ -1,6 +1,6 @@
 package user
 
-import "github.com/anguless/reviewer/internal/repository"
+import "github.com/anguless/mr-reviewer/internal/repository"
 
 type UserService struct {
 	userRepo repository.UserRepository

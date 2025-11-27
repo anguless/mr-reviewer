@@ -1,6 +1,6 @@
 package stat
 
-import "github.com/anguless/reviewer/internal/repository"
+import "github.com/anguless/mr-reviewer/internal/repository"
 
 type StatService struct {
 	statRepo repository.StatRepository

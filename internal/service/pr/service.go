@@ -1,6 +1,6 @@
 package pr
 
-import "github.com/anguless/reviewer/internal/repository"
+import "github.com/anguless/mr-reviewer/internal/repository"
 
 type PrService struct {
 	prRepo   repository.PrRepository

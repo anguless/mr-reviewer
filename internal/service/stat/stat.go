@@ -3,7 +3,7 @@ package stat
 import (
 	"context"
 
-	"github.com/anguless/reviewer/internal/model"
+	"github.com/anguless/mr-reviewer/internal/model"
 )
 
 func (s *StatService) GetReviewStats(ctx context.Context) (*model.ReviewStats, error) {

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/anguless/reviewer/internal/model"
+	"github.com/anguless/mr-reviewer/internal/model"
 	"github.com/google/uuid"
 )
 
