@@ -2,18 +2,30 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
+	"net"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
-	"github.com/anguless/mr-reviewer/internal/api/handlers"
+	"github.com/anguless/mr-reviewer/internal/api"
 	"github.com/anguless/mr-reviewer/internal/config"
 	"github.com/anguless/mr-reviewer/internal/db"
 	"github.com/anguless/mr-reviewer/internal/migrator"
 	"github.com/anguless/mr-reviewer/internal/repository"
 	"github.com/anguless/mr-reviewer/internal/service"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 
-	"github.com/gorilla/mux"
-	_ "github.com/lib/pq"
+	mrV1 "github.com/anguless/mr-reviewer/pkg/openapi/mr/v1"
+)
+
+const (
+	readHeaderTimeout = 5 * time.Second
+	shutdownTimeout   = 10 * time.Second
 )
 
 func main() {
@@ -51,37 +63,56 @@ func main() {
 
 	srvc := service.NewService(repo)
 
-	userHandler := &handlers.UserHandler{UserService: srvc.UserService}
-	teamHandler := &handlers.TeamHandler{TeamService: srvc.TeamService, PRService: srvc.PrService}
-	prHandler := &handlers.PRHandler{PRService: srvc.PrService}
-	statsHandler := &handlers.StatisticsHandler{StatService: srvc.StatService}
+	mrHandler := api.NewMrHandler(srvc)
 
-	r := mux.NewRouter()
-
-	r.HandleFunc("/health", handlers.HealthCheck).Methods("GET")
-
-	r.HandleFunc("/api/v1/users/create", userHandler.CreateUser).Methods("POST")
-	r.HandleFunc("/api/v1/users/{user_id}", userHandler.GetUser).Methods("GET")
-	r.HandleFunc("/api/v1/users/{user_id}", userHandler.UpdateUser).Methods("PUT")
-	r.HandleFunc("/api/v1/users/{user_id}", userHandler.DeleteUser).Methods("DELETE")
-	r.HandleFunc("/api/v1/users/{user_id}/pull-requests", userHandler.GetUserPRs).Methods("GET")
-
-	r.HandleFunc("/api/v1/team/add", teamHandler.CreateTeam).Methods("POST")
-	r.HandleFunc("/api/v1/team/{team_id}", teamHandler.GetTeam).Methods("GET")
-	r.HandleFunc("/api/v1/team/{team_id}", teamHandler.UpdateTeam).Methods("PUT")
-	r.HandleFunc("/api/v1/team/{team_id}", teamHandler.DeleteTeam).Methods("DELETE")
-
-	r.HandleFunc("/api/v1/pull-request/create", prHandler.CreatePR).Methods("POST")
-	r.HandleFunc("/api/v1/pull-request", prHandler.GetAllPRs).Methods("GET")
-	r.HandleFunc("/api/v1/pull-request/{pull_request_id}", prHandler.GetPR).Methods("GET")
-	r.HandleFunc("/api/v1/pull-request/reassign", prHandler.ReassignReviewer).Methods("POST")
-	r.HandleFunc("/api/v1/pull-request/merge", prHandler.MergePR).Methods("POST")
-
-	r.HandleFunc("/api/v1/statistics", statsHandler.GetStatistics).Methods("GET")
-
-	log.Printf("Starting server at %s", ":"+cfg.AppConfig.AppPort)
-
-	if err := http.ListenAndServe(":"+cfg.AppConfig.AppPort, r); err != nil {
-		log.Fatalf("Server failed: %v", err)
+	mrServer, err := mrV1.NewServer(mrHandler)
+	if err != nil {
+		log.Fatalf("ошибка создания сервера OpenAPI: %v", err)
 	}
+
+	r := chi.NewRouter()
+
+	// Добавляем middleware
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
+	r.Use(middleware.Timeout(10 * time.Second))
+
+	// Монтируем обработчики OpenAPI
+	r.Mount("/", mrServer)
+
+	// Запускаем HTTP-сервер
+	server := &http.Server{
+		Addr:              net.JoinHostPort("0.0.0.0", cfg.AppConfig.AppPort),
+		Handler:           r,
+		ReadHeaderTimeout: readHeaderTimeout, // Защита от Slowloris атак - тип DDoS-атаки, при которой
+		// атакующий умышленно медленно отправляет HTTP-заголовки, удерживая соединения открытыми и истощая
+		// пул доступных соединений на сервере. ReadHeaderTimeout принудительно закрывает соединение,
+		// если клиент не успел отправить все заголовки за отведенное время.
+	}
+
+	go func() {
+		log.Printf("🚀 HTTP-сервер запущен на порту %s\n", cfg.AppConfig.AppPort)
+		log.Printf("Адрес: %s\n", server.Addr)
+		err = server.ListenAndServe()
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("❌ Ошибка запуска сервера: %v\n", err)
+		}
+	}()
+
+	// Graceful shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("🛑 Завершение работы сервера...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+
+	err = server.Shutdown(ctx)
+	if err != nil {
+		log.Printf("❌ Ошибка при остановке сервера: %v\n", err)
+	}
+
+	log.Println("✅ Сервер остановлен")
 }

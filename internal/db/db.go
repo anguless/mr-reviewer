@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/anguless/mr-reviewer/internal/config"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -25,7 +26,9 @@ func NewDbPool(ctx context.Context, dbConfig *config.DbConfig) (*Db, error) {
 		return nil, fmt.Errorf("failed to create pgxpool: %w", err)
 	}
 
-	return &Db{pool}, nil
+	return &Db{
+		Pool: pool,
+	}, nil
 }
 
 func (db *Db) ToSqlDB() *sql.DB {

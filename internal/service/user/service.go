@@ -1,11 +1,26 @@
 package user
 
-import "github.com/anguless/mr-reviewer/internal/repository"
+import (
+	"context"
 
-type UserService struct {
-	userRepo repository.UserRepository
+	"github.com/anguless/mr-reviewer/internal/model"
+	"github.com/anguless/mr-reviewer/internal/repository/user"
+)
+
+type userService struct {
+	UserRepo user.UserRepository
 }
 
-func NewUserService(repo repository.UserRepository) *UserService {
-	return &UserService{userRepo: repo}
+func NewUserService(userRepo user.UserRepository) *userService {
+	return &userService{
+		UserRepo: userRepo,
+	}
+}
+
+type UserService interface {
+	UsersGetReviewGet(ctx context.Context, userID string) (*model.User, error)
+	UsersSetIsActivePost(ctx context.Context, userID string, isActive bool) (*model.User, error)
+	GetUser(ctx context.Context, userID string) (*model.User, error)
+	GetActiveUsersByTeam(ctx context.Context, teamName string) ([]model.User, error)
+	GetAssignedPRs(ctx context.Context, userID string) ([]model.PullRequestShort, error)
 }

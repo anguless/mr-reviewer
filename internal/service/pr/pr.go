@@ -2,153 +2,145 @@ package pr
 
 import (
 	"context"
-	"errors"
 	"math/rand"
 	"time"
 
 	"github.com/anguless/mr-reviewer/internal/model"
-	"github.com/google/uuid"
 )
 
-func (s *PrService) CreatePR(ctx context.Context, pr *model.PullRequest) (*model.PullRequest, error) {
-	author, err := s.userRepo.GetUserByID(ctx, pr.AuthorID)
-	if err != nil {
-		return nil, errors.New("Автор/команда не найдены")
-	}
+func (s *prService) PullRequestCreatePost(ctx context.Context, pr *model.PullRequest) (*model.PullRequest, error) {
+	pr.Status = model.PrStatusOpen
 
-	candidates, err := s.userRepo.GetActiveUsersByTeam(ctx, author.TeamID, pr.AuthorID)
+	authorTeamName, err := s.TeamRepository.GetTeamNameByUserID(ctx, pr.AuthorID)
 	if err != nil {
 		return nil, err
 	}
 
-	reviewers := s.selectRandomReviewers(ctx, candidates, 2)
-
-	pr.ID = uuid.New()
-	pr.Status = model.OPEN
-	pr.CreatedAt = time.Now()
-	pr.Reviewers = reviewers
-
-	err = s.prRepo.CreatePR(ctx, pr, reviewers)
+	activeUsers, err := s.UserRepository.GetActiveByTeam(ctx, authorTeamName)
 	if err != nil {
 		return nil, err
 	}
 
-	return pr, nil
+	var candidates []model.User
+	for _, user := range activeUsers {
+		if user.ID != pr.AuthorID {
+			candidates = append(candidates, user)
+		}
+	}
+
+	var reviewers []string
+	for i := 0; i < 2 && i < len(candidates); i++ {
+		reviewers = append(reviewers, candidates[i].ID)
+	}
+
+	pr.AssignedReviewers = reviewers
+
+	createdPR, err := s.PRRepository.Create(ctx, pr)
+	if err != nil {
+		return nil, err
+	}
+
+	return createdPR, nil
 }
 
-func (s *PrService) GetPRByID(ctx context.Context, id uuid.UUID) (*model.PullRequest, error) {
-	pr, err := s.prRepo.GetPRByID(ctx, id)
+func (s *prService) PullRequestMergePost(ctx context.Context, prID string) (*model.PullRequest, error) {
+	existingPR, err := s.PRRepository.GetByID(ctx, prID)
 	if err != nil {
-		return nil, errors.New("pull request not found")
+		return nil, err
 	}
-	return pr, nil
+
+	if existingPR.Status == model.PrStatusMerged {
+		return existingPR, nil
+	}
+
+	updatedPR, err := s.PRRepository.UpdateStatus(ctx, prID, model.PrStatusMerged)
+	if err != nil {
+		return nil, err
+	}
+
+	return updatedPR, nil
 }
 
-func (s *PrService) ReassignReviewer(
-	ctx context.Context,
-	prID uuid.UUID,
-	oldReviewerID uuid.UUID,
-) (*model.PullRequest, uuid.UUID, error) {
-	pr, err := s.prRepo.GetPRByID(ctx, prID)
+func (s *prService) PullRequestReassignPost(ctx context.Context, prID string, oldUserID string) (*model.PullRequest, string, error) {
+	var newCandidate string
+
+	pr, err := s.PRRepository.GetByID(ctx, prID)
 	if err != nil {
-		return nil, uuid.Nil, errors.New("pull request not found")
+		return nil, newCandidate, err
 	}
 
-	if pr.Status == model.MERGED {
-		return nil, uuid.Nil, errors.New("cannot reassign reviewers for merged PR")
+	if pr.Status == model.PrStatusMerged {
+		return nil, newCandidate, model.ErrMergedPR
 	}
 
-	found := false
-	for _, reviewerID := range pr.Reviewers {
-		if reviewerID == oldReviewerID {
-			found = true
+	isReviewer := false
+	for _, reviewerID := range pr.AssignedReviewers {
+		if reviewerID == oldUserID {
+			isReviewer = true
 			break
 		}
 	}
-	if !found {
-		return nil, uuid.Nil, errors.New("reviewer not assigned to this PR")
+
+	if !isReviewer {
+		return nil, newCandidate, model.ErrReviewerNotAssigned
 	}
 
-	oldReviewer, err := s.userRepo.GetUserByID(ctx, oldReviewerID)
+	reviewerTeamName, err := s.TeamRepository.GetTeamNameByUserID(ctx, oldUserID)
 	if err != nil {
-		return nil, uuid.Nil, errors.New("old reviewer not found")
+		return nil, newCandidate, err
 	}
 
-	excludeIDs := []uuid.UUID{pr.AuthorID, oldReviewerID}
-	for _, reviewerID := range pr.Reviewers {
-		if reviewerID != oldReviewerID {
-			excludeIDs = append(excludeIDs, reviewerID)
+	activeUsers, err := s.UserRepository.GetActiveByTeam(ctx, reviewerTeamName)
+	if err != nil {
+		return nil, newCandidate, err
+	}
+
+	var candidates []model.User
+	for _, user := range activeUsers {
+		isAssigned := false
+		for _, assignedReviewer := range pr.AssignedReviewers {
+			if user.ID == assignedReviewer || user.ID == pr.AuthorID {
+				isAssigned = true
+				break
+			}
+		}
+		if !isAssigned && user.ID != oldUserID {
+			candidates = append(candidates, user)
 		}
 	}
 
-	candidates, err := s.userRepo.GetActiveUsersByTeamExcluding(
-		ctx,
-		oldReviewer.TeamID,
-		excludeIDs,
-	)
-	if err != nil {
-		return nil, uuid.Nil, err
-	}
 	if len(candidates) == 0 {
-		return nil, uuid.Nil, errors.New("no available reviewers in the team")
+		return nil, newCandidate, model.ErrNoSuitableCandidate
 	}
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	newReviewerID := candidates[rng.Intn(len(candidates))].ID
+	newReviewer := candidates[rng.Intn(len(candidates))]
 
-	err = s.prRepo.ReassignReviewer(ctx, prID, oldReviewerID, newReviewerID)
-	if err != nil {
-		return nil, uuid.Nil, err
+	updatedReviewers := make([]string, len(pr.AssignedReviewers))
+	copy(updatedReviewers, pr.AssignedReviewers)
+	for i, reviewerID := range updatedReviewers {
+		if reviewerID == oldUserID {
+			updatedReviewers[i] = newReviewer.ID
+			break
+		}
 	}
 
-	updated, err := s.prRepo.GetPRByID(ctx, prID)
+	newCandidate = newReviewer.ID
+
+	pr.AssignedReviewers = updatedReviewers
+	updatedPR, err := s.PRRepository.UpdateReviewers(ctx, prID, updatedReviewers)
 	if err != nil {
-		return nil, uuid.Nil, err
+		return nil, newCandidate, err
 	}
 
-	return updated, newReviewerID, nil
+	return updatedPR, newCandidate, nil
 }
 
-func (s *PrService) MergePR(ctx context.Context, prID uuid.UUID) (*model.PullRequest, error) {
-	_, err := s.prRepo.GetPRByID(ctx, prID)
-	if err != nil {
-		return nil, errors.New("pull request not found")
-	}
-
-	err = s.prRepo.MergePR(ctx, prID)
+func (s *prService) GetPRsByReviewer(ctx context.Context, userID string) ([]model.PullRequestShort, error) {
+	prs, err := s.UserRepository.GetAssignedPRs(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.prRepo.GetPRByID(ctx, prID)
-}
-
-func (s *PrService) GetAllPRs(ctx context.Context) ([]model.PullRequest, error) {
-	return s.prRepo.GetAllPRs(ctx)
-}
-
-func (s *PrService) selectRandomReviewers(_ context.Context, candidates []model.User, maxCount int) []uuid.UUID {
-	if len(candidates) == 0 {
-		return []uuid.UUID{}
-	}
-
-	count := maxCount
-	if len(candidates) < maxCount {
-		count = len(candidates)
-	}
-
-	shuffled := make([]model.User, len(candidates))
-	copy(shuffled, candidates)
-
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	rng.Shuffle(len(shuffled), func(i, j int) {
-		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
-	})
-
-	reviewers := make([]uuid.UUID, 0, count)
-	for i := 0; i < count; i++ {
-		reviewers = append(reviewers, shuffled[i].ID)
-	}
-
-	return reviewers
+	return prs, nil
 }

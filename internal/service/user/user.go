@@ -5,39 +5,38 @@ import (
 	"errors"
 
 	"github.com/anguless/mr-reviewer/internal/model"
-	"github.com/google/uuid"
 )
 
-func (s *UserService) CreateUser(ctx context.Context, userC *model.User) (*model.User, error) {
-	user := &model.User{
-		ID:       uuid.New(),
-		Username: userC.Username,
-		TeamID:   userC.TeamID,
-		IsActive: userC.IsActive,
-	}
-	err := s.userRepo.CreateUser(ctx, user)
+func (s *userService) UsersGetReviewGet(ctx context.Context, userID string) (*model.User, error) {
+	user, err := s.UserRepo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	return user, nil
-}
 
-func (s *UserService) GetUserByID(ctx context.Context, id uuid.UUID) (*model.User, error) {
-	user, err := s.userRepo.GetUserByID(ctx, id)
-	if err != nil {
-		return nil, errors.New("user not found")
+	if !user.IsActive {
+		return nil, errors.New("user is not active")
 	}
+
 	return user, nil
 }
 
-func (s *UserService) UpdateUser(ctx context.Context, user *model.User) (*model.User, error) {
-	return s.userRepo.UpdateUser(ctx, user)
+func (s *userService) UsersSetIsActivePost(ctx context.Context, userID string, isActive bool) (*model.User, error) {
+	user, err := s.UserRepo.UpdateIsActive(ctx, userID, isActive)
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
 }
 
-func (s *UserService) DeleteUser(ctx context.Context, id uuid.UUID) error {
-	return s.userRepo.DeleteUser(ctx, id)
+func (s *userService) GetUser(ctx context.Context, userID string) (*model.User, error) {
+	return s.UserRepo.GetByID(ctx, userID)
 }
 
-func (s *UserService) GetAssignedPRs(ctx context.Context, userID uuid.UUID) ([]model.PullRequest, error) {
-	return s.userRepo.GetPRsByReviewer(ctx, userID)
+func (s *userService) GetActiveUsersByTeam(ctx context.Context, teamName string) ([]model.User, error) {
+	return s.UserRepo.GetActiveByTeam(ctx, teamName)
+}
+
+func (s *userService) GetAssignedPRs(ctx context.Context, userID string) ([]model.PullRequestShort, error) {
+	return s.UserRepo.GetAssignedPRs(ctx, userID)
 }

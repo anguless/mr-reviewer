@@ -1,17 +1,24 @@
 package team
 
 import (
-	"github.com/anguless/mr-reviewer/internal/repository"
+	"context"
+
+	"github.com/anguless/mr-reviewer/internal/model"
+	"github.com/anguless/mr-reviewer/internal/repository/team"
 )
 
-type TeamService struct {
-	teamRepo repository.TeamRepository
-	userRepo repository.UserRepository
+type teamService struct {
+	TeamRepository team.TeamRepository
 }
 
-func NewTeamService(teamRepo repository.TeamRepository, userRepo repository.UserRepository) *TeamService {
-	return &TeamService{
-		teamRepo: teamRepo,
-		userRepo: userRepo,
+func NewTeamService(teamRepo team.TeamRepository) *teamService {
+	return &teamService{
+		TeamRepository: teamRepo,
 	}
+}
+
+type TeamService interface {
+	TeamAddPost(ctx context.Context, team *model.Team) (*model.Team, error)
+	TeamGetGet(ctx context.Context, teamName string) (*model.Team, error)
+	GetTeamNameByUser(ctx context.Context, userID string) (string, error)
 }

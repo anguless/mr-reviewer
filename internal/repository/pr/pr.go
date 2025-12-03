@@ -3,276 +3,165 @@ package pr
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/anguless/mr-reviewer/internal/model"
-
-	"github.com/google/uuid"
 )
 
-// Create создает PR и назначает ревьюверов
-func (r *prRepository) CreatePR(ctx context.Context, pr *model.PullRequest, reviewers []uuid.UUID) error {
-	tx, err := r.db.Begin(ctx)
-	if err != nil {
-		return err
+func (r *prRepository) Create(ctx context.Context, pr *model.PullRequest) (*model.PullRequest, error) {
+	existingPR, err := r.GetByID(ctx, pr.PullRequestID)
+	if err == nil && existingPR != nil {
+		return nil, fmt.Errorf("pull request with id %s already exists", pr.PullRequestID)
 	}
-	defer func() {
-		err = tx.Rollback(ctx)
-		if err != nil {
-			return
-		}
-	}()
 
-	// Создаем PR
 	query := `
-		INSERT INTO pull_requests (id, pull_request_name, author_id, status, created_at)
-		VALUES ($1, $2, $3, $4, $5)
-	`
-	_, err = tx.Exec(ctx, query, pr.ID, pr.Title, pr.AuthorID, pr.Status, pr.CreatedAt)
-	if err != nil {
-		return err
+		INSERT INTO pull_requests (id, name, author_id, status, created_at) 
+		VALUES ($1, $2, $3, $4, $5)`
+
+	createdAt := pr.CreatedAt
+	if createdAt == nil {
+		now := time.Now()
+		createdAt = &now
 	}
 
-	// Назначаем ревьюверов
-	for _, reviewerID := range reviewers {
-		reviewerQuery := `
-			INSERT INTO pr_reviewers (pr_id, reviewer_id, assigned_at)
-			VALUES ($1, $2, $3)
-		`
-		_, err = tx.Exec(ctx, reviewerQuery, pr.ID, reviewerID, time.Now())
-		if err != nil {
-			return err
-		}
-	}
-
-	return tx.Commit(ctx)
-}
-
-// GetByID возвращает PR по ID с ревьюверами
-func (r *prRepository) GetPRByID(ctx context.Context, id uuid.UUID) (*model.PullRequest, error) {
-	query := `
-		SELECT id, pull_request_name, author_id, status, created_at, merged_at
-		FROM pull_requests
-		WHERE id = $1
-	`
-	row := r.db.QueryRow(ctx, query, id)
-	var pr model.PullRequest
-	err := row.Scan(&pr.ID, &pr.Title, &pr.AuthorID, &pr.Status, &pr.CreatedAt, &pr.MergedAt)
+	_, err = r.db.Exec(ctx, query, pr.PullRequestID, pr.PullRequestName, pr.AuthorID, pr.Status, createdAt)
 	if err != nil {
 		return nil, err
 	}
 
-	// Загружаем ревьюверов
-	reviewersQuery := `
-		SELECT reviewer_id
-		FROM pr_reviewers
-		WHERE pr_id = $1
-		ORDER BY assigned_at
-	`
-	reviewerRows, errQuery := r.db.Query(ctx, reviewersQuery, id)
-	if errQuery != nil {
-		return nil, errQuery
-	}
-	defer reviewerRows.Close()
-	if err := reviewerRows.Err(); err != nil {
-		return nil, err
-	}
-	var reviewers []uuid.UUID
-	for reviewerRows.Next() {
-		var reviewerID uuid.UUID
-		if err := reviewerRows.Scan(&reviewerID); err != nil {
+	for _, reviewerID := range pr.AssignedReviewers {
+		err = r.addReviewer(ctx, pr.PullRequestID, reviewerID)
+		if err != nil {
 			return nil, err
 		}
-		reviewers = append(reviewers, reviewerID)
 	}
-	pr.Reviewers = reviewers
+
+	return r.GetByID(ctx, pr.PullRequestID)
+}
+
+func (r *prRepository) GetByID(ctx context.Context, prID string) (*model.PullRequest, error) {
+	query := `SELECT id, name, author_id, status, created_at, merged_at FROM pull_requests WHERE id = $1`
+	row := r.db.QueryRow(ctx, query, prID)
+
+	var pr model.PullRequest
+	err := row.Scan(&pr.PullRequestID, &pr.PullRequestName, &pr.AuthorID, &pr.Status, &pr.CreatedAt, &pr.MergedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("pull request with id %s not found", prID)
+		}
+		return nil, err
+	}
+
+	reviewers, err := r.GetReviewers(ctx, prID)
+	if err != nil {
+		return nil, err
+	}
+	pr.AssignedReviewers = reviewers
 
 	return &pr, nil
 }
 
-// Update обновляет PR
-func (r *prRepository) UpdatePR(ctx context.Context, pr *model.PullRequest) error {
-	query := `
-		UPDATE pull_requests
-		SET pull_request_name = $1, status = $2, merged_at = $3
-		WHERE id = $4
-	`
-	_, err := r.db.Exec(ctx, query, pr.Title, pr.Status, pr.MergedAt, pr.ID)
-	return err
-}
+func (r *prRepository) UpdateStatus(ctx context.Context, prID string, status model.PrStatus) (*model.PullRequest, error) {
+	var query string
+	var args []interface{}
 
-// ReassignReviewer заменяет одного ревьювера на другого в указанном PR.
-//
-// Оптимизированная версия, которая выполняет проверки в одном SQL запросе
-// для уменьшения количества обращений к БД и улучшения производительности.
-//
-// Бизнес-правила:
-//   - PR должен иметь статус OPEN (нельзя переназначать в MERGED)
-//   - Старый ревьювер должен быть назначен на PR
-//   - Операция выполняется в транзакции для атомарности
-//
-// Параметры:
-//   - prID: UUID Pull Request
-//   - oldReviewerID: UUID ревьювера, которого нужно заменить
-//   - newReviewerID: UUID нового ревьювера
-//
-// Возвращает:
-//   - error: ошибка, если:
-//   - PR не найден
-//   - PR имеет статус MERGED
-//   - Старый ревьювер не назначен на PR
-//   - Ошибка выполнения транзакции
-//
-// Пример использования:
-//
-//	err := repo.ReassignReviewer(prID, oldReviewerID, newReviewerID)
-func (r *prRepository) ReassignReviewer(ctx context.Context, prID, oldReviewerID, newReviewerID uuid.UUID) error {
-	// Начинаем транзакцию для обеспечения атомарности операции
-	// Если произойдет ошибка, все изменения будут откачены
-	tx, err := r.db.Begin(ctx)
-	if err != nil {
-		return err
+	if status == model.PrStatusMerged {
+		query = `UPDATE pull_requests SET status = $1, merged_at = $2 WHERE id = $3 RETURNING id, name, author_id, status, created_at, merged_at`
+		args = []interface{}{status, time.Now(), prID}
+	} else {
+		query = `UPDATE pull_requests SET status = $1 WHERE id = $2 RETURNING id, name, author_id, status, created_at, merged_at`
+		args = []interface{}{status, prID}
 	}
-	defer func() {
-		err = tx.Rollback(ctx)
-		if err != nil {
-			return
+
+	row := r.db.QueryRow(ctx, query, args...)
+
+	var pr model.PullRequest
+	err := row.Scan(&pr.PullRequestID, &pr.PullRequestName, &pr.AuthorID, &pr.Status, &pr.CreatedAt, &pr.MergedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("pull request with id %s not found", prID)
 		}
-	}()
+		return nil, err
+	}
 
-	// Оптимизированная проверка: проверяем статус PR и существование ревьювера в одном запросе
-	// Это уменьшает количество обращений к БД с 2 до 1, что важно для производительности
-	var status string
-	var reviewerExists bool
-	checkQuery := `
-		SELECT pr.status, EXISTS(
-			SELECT 1 FROM pr_reviewers 
-			WHERE pr_id = $1 AND reviewer_id = $2
-		)
-		FROM pull_requests pr
-		WHERE pr.id = $1
-	`
-	err = tx.QueryRow(ctx, checkQuery, prID, oldReviewerID).Scan(&status, &reviewerExists)
+	reviewers, err := r.GetReviewers(ctx, prID)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if status == "MERGED" {
-		return sql.ErrNoRows
-	}
-	if !reviewerExists {
-		return sql.ErrNoRows
-	}
+	pr.AssignedReviewers = reviewers
 
-	// Удаляем старого ревьювера
-	deleteQuery := `
-		DELETE FROM pr_reviewers
-		WHERE pr_id = $1 AND reviewer_id = $2
-	`
-	_, err = tx.Exec(ctx, deleteQuery, prID, oldReviewerID)
-	if err != nil {
-		return err
-	}
-
-	// Добавляем нового ревьювера
-	insertQuery := `
-		INSERT INTO pr_reviewers (pr_id, reviewer_id, assigned_at)
-		VALUES ($1, $2, $3)
-	`
-	_, err = tx.Exec(ctx, insertQuery, prID, newReviewerID, time.Now())
-	if err != nil {
-		return err
-	}
-
-	return tx.Commit(ctx)
+	return &pr, nil
 }
 
-// Merge переводит PR в статус MERGED (идемпотентно)
-func (r *prRepository) MergePR(ctx context.Context, prID uuid.UUID) error {
-	tx, err := r.db.Begin(ctx)
+func (r *prRepository) UpdateReviewers(ctx context.Context, prID string, reviewers []string) (*model.PullRequest, error) {
+	deleteQuery := `DELETE FROM pr_reviewers WHERE pr_id = $1`
+	_, err := r.db.Exec(ctx, deleteQuery, prID)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer func() {
-		err = tx.Rollback(ctx)
+
+	for _, reviewerID := range reviewers {
+		err = r.addReviewer(ctx, prID, reviewerID)
 		if err != nil {
-			return
+			return nil, err
 		}
-	}()
-
-	// Проверяем текущий статус
-	var currentStatus string
-	var mergedAt *time.Time
-	statusQuery := `SELECT status, merged_at FROM pull_requests WHERE id = $1`
-	err = tx.QueryRow(ctx, statusQuery, prID).Scan(&currentStatus, &mergedAt)
-	if err != nil {
-		return err
 	}
 
-	// Если уже MERGED, ничего не делаем (идемпотентность)
-	if currentStatus == "MERGED" {
-		return tx.Commit(ctx)
-	}
-
-	// Обновляем статус
-	now := time.Now()
-	updateQuery := `
-		UPDATE pull_requests
-		SET status = 'MERGED', merged_at = $1
-		WHERE id = $2
-	`
-	_, err = tx.Exec(ctx, updateQuery, now, prID)
-	if err != nil {
-		return err
-	}
-
-	return tx.Commit(ctx)
+	return r.GetByID(ctx, prID)
 }
 
-// GetAll возвращает все PR
-func (r *prRepository) GetAllPRs(ctx context.Context) ([]model.PullRequest, error) {
-	query := `
-		SELECT id, pull_request_name, author_id, status, created_at, merged_at
-		FROM pull_requests
-		ORDER BY created_at DESC
-	`
-	rows, err := r.db.Query(ctx, query)
+func (r *prRepository) GetReviewers(ctx context.Context, prID string) ([]string, error) {
+	query := `SELECT reviewer_id FROM pr_reviewers WHERE pr_id = $1 ORDER BY reviewer_id`
+	rows, err := r.db.Query(ctx, query, prID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	var prs []model.PullRequest
+
+	var reviewers []string
 	for rows.Next() {
-		var pr model.PullRequest
-		err = rows.Scan(&pr.ID, &pr.Title, &pr.AuthorID, &pr.Status, &pr.CreatedAt, &pr.MergedAt)
+		var reviewerID string
+		err := rows.Scan(&reviewerID)
 		if err != nil {
 			return nil, err
 		}
-
-		// Загружаем ревьюверов
-		reviewersQuery := `SELECT reviewer_id FROM pr_reviewers WHERE pr_id = $1 ORDER BY assigned_at`
-		reviewerRows, errQuery := r.db.Query(ctx, reviewersQuery, pr.ID)
-		if errQuery != nil {
-			return nil, errQuery
-		}
-		var reviewers []uuid.UUID
-		for reviewerRows.Next() {
-			var reviewerID uuid.UUID
-			if err = reviewerRows.Scan(&reviewerID); err != nil {
-				reviewerRows.Close()
-				return nil, err
-			}
-			reviewers = append(reviewers, reviewerID)
-		}
-		reviewerRows.Close()
-		pr.Reviewers = reviewers
-		if err := reviewerRows.Err(); err != nil {
-			return nil, err
-		}
-		prs = append(prs, pr)
+		reviewers = append(reviewers, reviewerID)
 	}
 
-	return prs, nil
+	return reviewers, nil
+}
+
+func (r *prRepository) ReplaceReviewer(ctx context.Context, prID, oldReviewerID, newReviewerID string) (*model.PullRequest, error) {
+	query := `SELECT 1 FROM pr_reviewers WHERE pr_id = $1 AND reviewer_id = $2 LIMIT 1`
+	row := r.db.QueryRow(ctx, query, prID, oldReviewerID)
+
+	var exists int
+	err := row.Scan(&exists)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("reviewer %s is not assigned to pull request %s", oldReviewerID, prID)
+		}
+		return nil, err
+	}
+
+	deleteQuery := `DELETE FROM pr_reviewers WHERE pr_id = $1 AND reviewer_id = $2`
+	_, err = r.db.Exec(ctx, deleteQuery, prID, oldReviewerID)
+	if err != nil {
+		return nil, err
+	}
+
+	err = r.addReviewer(ctx, prID, newReviewerID)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.GetByID(ctx, prID)
+}
+
+func (r *prRepository) addReviewer(ctx context.Context, prID, reviewerID string) error {
+	query := `INSERT INTO pr_reviewers (pr_id, reviewer_id) VALUES ($1, $2)`
+	_, err := r.db.Exec(ctx, query, prID, reviewerID)
+	return err
 }

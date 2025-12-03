@@ -1,22 +1,24 @@
 # Сервис назначения ревьюеров для Pull Request'ов
 
-Сервис для автоматического назначения ревьюеров на Pull Request
+***Тестовое задание для backend-стажировки в Авито, осень 2025***
+
+Сервис "PR Reviewer Assignment Service" предназначен для автоматизации процесса назначения ревьюеров к Pull Requests (PR) в командах разработки.
+Он позволяет создавать команды с участниками, отмечать активность пользователей, создавать и отслеживать статус пулл-реквестов,
+а также управлять назначением и перераспределением ревьюверов в пределах команды.
 
 ## Описание
 
-Сервис предоставляет HTTP API для:
-- Управления пользователями (создание, обновление, удаление, получение)
-- Управления командами (создание, обновление, удаление, получение)
-- Создания PR с автоматическим назначением ревьюеров (до 2 активных ревьюверов из команды автора)
-- Переназначения ревьюверов (из команды заменяемого ревьювера)
-- Объединения PR (идемпотентная операция)
-- Получения списка PR, назначенных конкретному пользователю
+Основные функции данного сервиса:
+- Управление командами и их участниками (создание команд, получение информации о командах).
+- Управление пользователями с возможностью установки статуса активности.
+- Управление пулл-реквестами: создание новых PR, слияние (merge) PR, получение списка PR для обзора, перераспределение ревьюверов.
+- Предоставление информации о назначенных PR для конкретного пользователя для удобства управления ревьюванием кода.
 
-## Используемый тек
+## Используемый cтек
 
-- **Язык**: Go 1.24
+- **Язык**: Go 1.24.7
 - **База данных**: PostgreSQL 17
-- **HTTP роутер**: Gorilla Mux
+- **HTTP роутер**: Chi
 - **Миграции**: Goose
 - **Контейнеризация**: Docker & Docker Compose
 
@@ -30,7 +32,7 @@ cd mr-reviewer
 
 2. Запускаем сервис:
 ```bash
-docker-compose up
+docker-compose up -d
 ```
 
 Сервис будет доступен на `http://localhost:8080`
@@ -39,90 +41,112 @@ docker-compose up
 
 ## Описание ручек
 
-### Health Check
-- `GET /health` - Проверка готовности сервиса
+### Teams
+- `/team/add` - `POST` - Создание команды с именем и списком участников.
+
+***Пример***
+```bash
+curl -X 'POST' \
+  'http://localhost:8080/team/add' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "team_name": "payments",
+    "members": [
+      {
+        "user_id": "u1",
+        "username": "Alice",
+        "is_active": true
+      },
+      {
+        "user_id": "u2",
+        "username": "Bob",
+        "is_active": true
+      }
+    ]
+  }'
+```
+- `/team/get` - `GET`. Получение информации о команде по параметру ?teamname=.
+  
+***Пример***
+```bash
+curl -X 'GET' \
+  'http://localhost:8080/team/get?teamname=backend' \
+  -H 'accept: application/json'
+```
 
 ### Users
-- `POST /api/v1/users` - Создать пользователя
-- `GET /api/v1/users/{user_id}` - Получить пользователя
-- `PUT /api/v1/users/{user_id}` - Обновить пользователя
-- `DELETE /api/v1/users/{user_id}` - Удалить пользователя
-- `GET /api/v1/users/{user_id}/pull-requests` - Получить список PR, назначенных пользователю
+- `/users/setIsActive` - `POST`. Установка активности пользователя (is_active true/false) по user_id.
+  
+***Пример***
+```bash
+curl -X 'POST' \
+  'http://localhost:8080/users/setIsActive' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "user_id": "u2",
+    "is_active": false
+  }'
 
-### Teams
-- `POST /api/v1/teams` - Создать команду
-- `GET /api/v1/teams/{team_id}` - Получить команду
-- `PUT /api/v1/teams/{team_id}` - Обновить команду
-- `DELETE /api/v1/teams/{team_id}` - Удалить команду
+```
+- `/users/getReview` - `GET`. Получение списка PR для ревью по параметру ?userid=.
+
+***Пример***
+```bash
+curl -X 'GET' \
+  'http://localhost:8080/users/getReview?userid=u2' \
+  -H 'accept: application/json'
+
+```
 
 ### Pull Requests
-- `POST /api/v1/pull-requests` - Создать PR (автоматически назначаются ревьюверы)
-- `GET /api/v1/pull-requests` - Получить все PR
-- `GET /api/v1/pull-requests/{pull_request_id}` - Получить PR по ID
-- `POST /api/v1/pull-requests/{pull_request_id}/reassign` - Переназначить ревьювера
-- `POST /api/v1/pull-requests/{pull_request_id}/merge` - Объединить PR
+- `/pullRequest/create` - `POST`. Создание Pull Request с ID, названием и автором.
+    При создании PR автоматически назначаются до 2 активных ревьюверов из команды автора (исключая самого автора).
 
-## Примеры использования
-
-### Создание команды
+***Пример***
 ```bash
-curl -X POST http://localhost:8080/api/v1/team/add \
-  -H "Content-Type: application/json" \
-  -d '
-  {
-  "team_name": "team",
-  "members": [
-    {
-      "username": "Ivan Ivanov",
-      "is_active": true
-    }
-  ]
-}'
-```
-
-### Создание пользователя
-```bash
-curl -X POST http://localhost:8080/api/v1/users \
-  -H "Content-Type: application/json" \
+curl -X 'POST' \
+  'http://localhost:8080/pullRequest/create' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
   -d '{
-    "username": "john_doe",
-    "team_id": "<team_id>",
-    "is_active": true
+    "pull_request_id": "pr-1001",
+    "pull_request_name": "Add search",
+    "author_id": "u1"
   }'
 ```
 
-### Создание PR
+- `/pullRequest/merge` - `POST`. Слияние (merge) Pull Request'а по ID, обновляет статус на MERGED.
+  
+***Пример***
 ```bash
-curl -X POST http://localhost:8080/api/v1/pull-requests \
-  -H "Content-Type: application/json" \
+curl -X 'POST' \
+  'http://localhost:8080/pullRequest/merge' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
   -d '{
-    "pull_request_name": "Add new feature",
-    "author_id": "<user_id>"
+    "pull_request_id": "pr-1001"
   }'
 ```
 
-При создании PR автоматически назначаются до 2 активных ревьюверов из команды автора (исключая самого автора).
+- `/pullRequest/reassign` - `POST`. Замена ревьювера (old_user_id) на другого активного в команде. Новый ревьювер выбирается случайным образом из команды заменяемого ревьювера.
+    Операция идемпотентна - повторный вызов не приводит к ошибке.
 
-### Переназначение ревьювера
+***Пример***
 ```bash
-curl -X POST http://localhost:8080/api/v1/pull-requests/<pr_id>/reassign \
-  -H "Content-Type: application/json" \
+curl -X 'POST' \
+  'http://localhost:8080/pullRequest/reassign' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
   -d '{
-    "reviewer_id": "<reviewer_id_to_replace>"
+    "pull_request_id": "pr-1001",
+    "old_user_id": "u2"
   }'
 ```
-
-Новый ревьювер выбирается случайным образом из команды заменяемого ревьювера.
-
-### Объединение PR
-```bash
-curl -X POST http://localhost:8080/api/v1/pull-requests/<pr_id>/merge
-```
-
-Операция идемпотентна - повторный вызов не приводит к ошибке.
 
 ## Taskfile
-В проекте используется taskfile (в качестве альтернативы makefile)
+В проекте используется ***Taskfile*** (в качестве альтернативы ***Makefile***)
 
 Taskfile устанавливается следующей командой:
 ```bash
@@ -145,3 +169,8 @@ go install github.com/go-task/task/v3/cmd/task@latest
 ```bash
 task lint
 ```
+
+### Примечание
+
+Файл **.env** добавлен в репозиторий намеренно, а не по случайности или невнимательности :)
+Сделано это в соответствии с условиями и правилами выполнения данного тестового задания, а также для удобства проверяющих.
