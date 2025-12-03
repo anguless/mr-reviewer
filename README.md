@@ -71,7 +71,7 @@ curl -X 'POST' \
 ***Пример***
 ```bash
 curl -X 'GET' \
-  'http://localhost:8080/team/get?teamname=backend' \
+  'http://localhost:8080/team/get?team_name=backend' \
   -H 'accept: application/json'
 ```
 
@@ -95,7 +95,7 @@ curl -X 'POST' \
 ***Пример***
 ```bash
 curl -X 'GET' \
-  'http://localhost:8080/users/getReview?userid=u2' \
+  'http://localhost:8080/users/getReview?user_id=u2' \
   -H 'accept: application/json'
 
 ```
