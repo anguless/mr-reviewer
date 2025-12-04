@@ -57,6 +57,8 @@ linters:
   settings:
 
     gosec:
+      excludes:
+        - G404
       config:
         global:
           audit: true
