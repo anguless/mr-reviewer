@@ -10,7 +10,7 @@ type AppConfig struct {
 
 var defaultAppPort = "8080"
 
-func loadAppConfig() (*AppConfig, error) {
+func loadAppConfig() *AppConfig {
 	appPort := os.Getenv("APP_PORT")
 
 	if appPort == "" {
@@ -19,5 +19,5 @@ func loadAppConfig() (*AppConfig, error) {
 
 	return &AppConfig{
 		AppPort: appPort,
-	}, nil
+	}
 }

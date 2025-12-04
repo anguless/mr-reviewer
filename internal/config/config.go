@@ -15,7 +15,7 @@ type Config struct {
 func LoadConfig() (*Config, error) {
 	err := godotenv.Load(".env")
 	if err != nil {
-		return nil, fmt.Errorf("failed to load .env file: %w\n", err)
+		return nil, fmt.Errorf("failed to load .env file: %w", err)
 	}
 
 	dbConfig, err := loadDbConfig()
@@ -28,7 +28,7 @@ func LoadConfig() (*Config, error) {
 		return nil, err
 	}
 
-	appConfig, err := loadAppConfig()
+	appConfig := loadAppConfig()
 
 	return &Config{
 		DbConfig:        dbConfig,

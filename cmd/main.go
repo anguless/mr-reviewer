@@ -48,7 +48,7 @@ func main() {
 
 	err = dbConn.Ping(ctx)
 	if err != nil {
-		log.Fatalf("База данных недоступна: %v\n", err)
+		log.Printf("База данных недоступна: %v\n", err)
 		return
 	}
 
@@ -56,7 +56,7 @@ func main() {
 
 	err = migratorRunner.Up()
 	if err != nil {
-		log.Fatalf("Ошибка миграции базы данных: %v\n", err)
+		log.Printf("Ошибка миграции базы данных: %v\n", err)
 		return
 	}
 
@@ -70,7 +70,7 @@ func main() {
 
 	mrServer, err := mrV1.NewServer(mrHandler)
 	if err != nil {
-		log.Fatalf("ошибка создания сервера OpenAPI: %v", err)
+		log.Printf("ошибка создания сервера OpenAPI: %v", err)
 	}
 
 	r := chi.NewRouter()
