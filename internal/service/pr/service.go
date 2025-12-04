@@ -7,19 +7,27 @@ import (
 	"github.com/anguless/mr-reviewer/internal/repository/pr"
 	"github.com/anguless/mr-reviewer/internal/repository/team"
 	"github.com/anguless/mr-reviewer/internal/repository/user"
+	service "github.com/anguless/mr-reviewer/internal/service/util"
 )
 
 type prService struct {
 	PRRepository   pr.PRRepository
 	UserRepository user.UserRepository
 	TeamRepository team.TeamRepository
+	rnd            service.RandomGenerator
 }
 
-func NewPRService(prRepo pr.PRRepository, userRepo user.UserRepository, teamRepo team.TeamRepository) *prService {
+func NewPRService(
+	prRepo pr.PRRepository,
+	userRepo user.UserRepository,
+	teamRepo team.TeamRepository,
+	rnd service.RandomGenerator) *prService {
+
 	return &prService{
 		PRRepository:   prRepo,
 		UserRepository: userRepo,
 		TeamRepository: teamRepo,
+		rnd:            rnd,
 	}
 }
 

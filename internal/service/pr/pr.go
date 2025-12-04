@@ -2,8 +2,6 @@ package pr
 
 import (
 	"context"
-	"math/rand"
-	"time"
 
 	"github.com/anguless/mr-reviewer/internal/model"
 )
@@ -113,8 +111,7 @@ func (s *prService) PullRequestReassignPost(ctx context.Context, prID string, ol
 		return nil, newCandidate, model.ErrNoSuitableCandidate
 	}
 
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	newReviewer := candidates[rng.Intn(len(candidates))]
+	newReviewer := candidates[s.rnd.Intn(len(candidates))]
 
 	updatedReviewers := make([]string, len(pr.AssignedReviewers))
 	copy(updatedReviewers, pr.AssignedReviewers)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -59,9 +60,11 @@ func main() {
 		return
 	}
 
+	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+
 	repo := repository.NewRepository(dbConn)
 
-	srvc := service.NewService(repo)
+	srvc := service.NewService(repo, rnd)
 
 	mrHandler := api.NewMrHandler(srvc)
 
