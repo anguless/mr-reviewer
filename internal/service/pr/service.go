@@ -21,8 +21,8 @@ func NewPRService(
 	prRepo pr.PRRepository,
 	userRepo user.UserRepository,
 	teamRepo team.TeamRepository,
-	rnd service.RandomGenerator) *prService {
-
+	rnd service.RandomGenerator,
+) *prService {
 	return &prService{
 		PRRepository:   prRepo,
 		UserRepository: userRepo,
@@ -34,6 +34,6 @@ func NewPRService(
 type PRService interface {
 	PullRequestCreatePost(ctx context.Context, pr *model.PullRequest) (*model.PullRequest, error)
 	PullRequestMergePost(ctx context.Context, prID string) (*model.PullRequest, error)
-	PullRequestReassignPost(ctx context.Context, prID string, oldUserID string) (*model.PullRequest, string, error)
+	PullRequestReassignPost(ctx context.Context, prID, oldUserID string) (*model.PullRequest, string, error)
 	GetPRsByReviewer(ctx context.Context, userID string) ([]model.PullRequestShort, error)
 }

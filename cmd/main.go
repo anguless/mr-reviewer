@@ -12,15 +12,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+
 	"github.com/anguless/mr-reviewer/internal/api"
 	"github.com/anguless/mr-reviewer/internal/config"
 	"github.com/anguless/mr-reviewer/internal/db"
 	"github.com/anguless/mr-reviewer/internal/migrator"
 	"github.com/anguless/mr-reviewer/internal/repository"
 	"github.com/anguless/mr-reviewer/internal/service"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-
 	mrV1 "github.com/anguless/mr-reviewer/pkg/openapi/mr/v1"
 )
 

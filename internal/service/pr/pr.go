@@ -59,7 +59,7 @@ func (s *prService) PullRequestMergePost(ctx context.Context, prID string) (*mod
 	return updatedPR, nil
 }
 
-func (s *prService) PullRequestReassignPost(ctx context.Context, prID string, oldUserID string) (*model.PullRequest, string, error) {
+func (s *prService) PullRequestReassignPost(ctx context.Context, prID, oldUserID string) (*model.PullRequest, string, error) {
 	var newCandidate string
 
 	pr, err := s.PRRepository.GetByID(ctx, prID)
