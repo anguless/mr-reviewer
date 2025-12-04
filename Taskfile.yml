@@ -1,6 +1,5 @@
 version: '3'
 
-# Глобальные переменные проекта
 vars:
   GO_VERSION: '1.24.6'
   GOLANGCI_LINT_VERSION: 'v2.5.0'
@@ -114,3 +113,32 @@ tasks:
           fi
         done
         exit $ERR
+
+  ogen:install:
+    desc: "Скачивает ogen в папку bin"
+    cmds:
+      - |
+        [ -f {{.OGEN}} ] || {
+          mkdir -p {{.BIN_DIR}}
+          GOBIN={{.BIN_DIR}} go install github.com/ogen-go/ogen/cmd/ogen@{{.OGEN_VERSION}}
+        }
+
+  ogen:gen:
+    desc: "Генерация Go-кода из всех OpenAPI-деклараций с x-ogen"
+    deps: [ ogen:install ]
+    cmds:
+      - |
+        find {{.OPEN_API_FILE}} -name '*.yaml' -o -name '*.yml' | while read -r file; do
+          if [ -f "$file" ] && grep -q 'x-ogen:' "$file"; then
+            echo "🚀 Generating from: $file"
+            target="./pkg/openapi/mr/v1"
+            package="mr_v1"
+            echo "📁 Target: $target"
+            echo "📦 Package: $package"
+            {{.OGEN}} \
+              --target "$target" \
+              --package "$package" \
+              --clean \
+              "$file" || exit 1
+          fi
+        done
